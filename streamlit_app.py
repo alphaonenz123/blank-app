@@ -1,7 +1,24 @@
-import streamlit as st
-import folium
-from folium.plugins import Draw
-from streamlit_folium import folium_static
+import sys
+
+try:
+    import streamlit as st
+except ImportError as e:
+    print(f"Error importing streamlit: {e}")
+    sys.exit(1)
+
+try:
+    import folium
+    from folium.plugins import Draw
+except ImportError as e:
+    print(f"Error importing folium: {e}")
+    sys.exit(1)
+
+try:
+    from streamlit_folium import folium_static
+except ImportError as e:
+    print(f"Error importing streamlit_folium: {e}")
+    sys.exit(1)
+
 import io
 
 def main():
