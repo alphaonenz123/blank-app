@@ -5,7 +5,6 @@ from streamlit_folium import folium_static
 import io
 import uuid
 import requests
-from geopy.geocoders import Nominatim
 
 def add_text_to_map(m):
     js = """
@@ -118,10 +117,12 @@ def add_contours(m):
     ).add_to(m)
 
 def geocode_address(address):
-    geolocator = Nominatim(user_agent="my_app")
-    location = geolocator.geocode(address)
-    if location:
-        return location.latitude, location.longitude
+    url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        if data:
+            return float(data[0]['lat']), float(data[0]['lon'])
     return None
 
 def main():
@@ -195,8 +196,7 @@ def main():
         result = geocode_address(address)
         if result:
             lat, lon = result
-            m.location = [lat, lon]
-            m.zoom_start = 15
+            m = folium.Map(location=[lat, lon], zoom_start=15)
             folium.Marker([lat, lon], popup=address).add_to(m)
         else:
             st.error("Could not find the address. Please try again.")
