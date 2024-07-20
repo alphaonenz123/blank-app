@@ -2,8 +2,7 @@ import streamlit as st
 import folium
 from folium.plugins import Draw
 from streamlit_folium import folium_static
-import json
-import base64
+import io
 
 def main():
     st.title("Interactive Map Marker")
@@ -56,17 +55,16 @@ def main():
 
     # Export map button
     if st.button("Export Map"):
-        # Save the map as HTML
-        m.save("exported_map.html")
+        # Save the map to a string buffer
+        buffer = io.BytesIO()
+        m.save(buffer, close_file=False)
         
-        # Read the saved HTML file
-        with open("exported_map.html", "rb") as file:
-            btn = st.download_button(
-                label="Download Map",
-                data=file,
-                file_name="interactive_map.html",
-                mime="text/html"
-            )
+        btn = st.download_button(
+            label="Download Map",
+            data=buffer.getvalue().decode(),
+            file_name="interactive_map.html",
+            mime="text/html"
+        )
 
 if __name__ == "__main__":
     main()
