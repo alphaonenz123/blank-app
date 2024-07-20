@@ -7,7 +7,7 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    import folium
+    import streamlit-folium
     from folium.plugins import Draw
 except ImportError as e:
     print(f"Error importing folium: {e}")
