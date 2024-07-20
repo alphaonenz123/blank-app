@@ -134,7 +134,11 @@ def main():
     st.title("Interactive Map with Layers, Location, Drawing, and Text")
 
     # Initialize the map
-    m = folium.Map(location=[0, 0], zoom_start=2, control_scale=True)
+    initial_lat = st.number_input("Enter latitude", value=0.0, min_value=-90.0, max_value=90.0)
+    initial_lon = st.number_input("Enter longitude", value=0.0, min_value=-180.0, max_value=180.0)
+    zoom_level = st.slider("Zoom level", min_value=1, max_value=18, value=2)
+
+    m = folium.Map(location=[initial_lat, initial_lon], zoom_start=zoom_level, control_scale=True)
 
     # Add tile layers
     folium.TileLayer('OpenStreetMap').add_to(m)
@@ -195,21 +199,8 @@ def main():
     """
     m.get_root().html.add_child(folium.Element(css))
 
-    # Address input
-    address = st.text_input("Enter an address to zoom to:")
-    if address:
-        try:
-            result = geocode_address(address)
-            if result:
-                lat, lon = result
-                m = folium.Map(location=[lat, lon], zoom_start=15)
-                folium.Marker([lat, lon], popup=address).add_to(m)
-                st.success(f"Address found: {address}")
-            else:
-                st.warning("Could not find the address. Please try a more specific address.")
-        except Exception as e:
-            st.error(f"An error occurred while searching for the address: {str(e)}")
-            st.info("Please try again or use a different address.")
+    # Add a marker at the specified coordinates
+    folium.Marker([initial_lat, initial_lon], popup=f"Lat: {initial_lat}, Lon: {initial_lon}").add_to(m)
 
     # Display the map
     try:
