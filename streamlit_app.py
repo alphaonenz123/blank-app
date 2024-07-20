@@ -8,16 +8,128 @@ import requests
 from PIL import Image
 
 def add_text_to_map(m):
-    # ... (code remains the same)
+    js = """
+    var text = L.control({position: 'topright'});
+    text.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'info');
+        div.innerHTML = '<input type="text" id="textInput" placeholder="Enter text">' +
+                        '<button onclick="addText()">Add Text</button>';
+        return div;
+    };
+    text.addTo(map);
+
+    function addText() {
+        var input = document.getElementById('textInput');
+        var text = input.value;
+        if (text) {
+            var center = map.getCenter();
+            L.marker(center, {
+                icon: L.divIcon({
+                    className: 'text-label',
+                    html: text,
+                    iconSize: [100, 40]
+                })
+            }).addTo(map);
+            input.value = '';
+        }
+    }
+
+    map.on('click', function(e) {
+        var text = prompt("Enter text for this location:");
+        if (text) {
+            L.marker(e.latlng, {
+                icon: L.divIcon({
+                    className: 'text-label',
+                    html: text,
+                    iconSize: [100, 40]
+                })
+            }).addTo(map);
+        }
+    });
+    """
+    m.get_root().html.add_child(folium.Element(js))
 
 def add_location_button(m):
-    # ... (code remains the same)
+    js = """
+    L.Control.LocationButton = L.Control.extend({
+        onAdd: function(map) {
+            var btn = L.DomUtil.create('button', 'location-button');
+            btn.innerHTML = 'My Location';
+            btn.style.backgroundColor = 'white';
+            btn.style.padding = '5px';
+            btn.style.border = '2px solid #ccc';
+            btn.style.borderRadius = '4px';
+            btn.onclick = function() {
+                map.locate({setView: true, maxZoom: 16});
+            };
+            return btn;
+        }
+    });
+    L.control.locationButton = function(opts) {
+        return new L.Control.LocationButton(opts);
+    }
+    L.control.locationButton({ position: 'topleft' }).addTo(map);
+
+    map.on('locationfound', function(e) {
+        var radius = e.accuracy / 2;
+        L.marker(e.latlng).addTo(map)
+            .bindPopup("You are within " + radius + " meters from this point").openPopup();
+        L.circle(e.latlng, radius).addTo(map);
+    });
+
+    map.on('locationerror', function(e) {
+        alert(e.message);
+    });
+    """
+    m.get_root().html.add_child(folium.Element(js))
 
 def add_contours(m):
-    # ... (code remains the same)
+    # This is a simplified example. In a real-world scenario, you'd use actual contour data.
+    contour_data = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {"elevation": 100},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-5, 40], [5, 40]]
+                }
+            },
+            {
+                "type": "Feature",
+                "properties": {"elevation": 200},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-5, 45], [5, 45]]
+                }
+            }
+        ]
+    }
+    
+    folium.GeoJson(
+        contour_data,
+        name="Contours",
+        style_function=lambda feature: {
+            "color": "red",
+            "weight": 2,
+            "opacity": 0.7
+        }
+    ).add_to(m)
 
 def geocode_address(address):
-    # ... (code remains the same)
+    url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        data = response.json()
+        if data:
+            return float(data[0]['lat']), float(data[0]['lon'])
+        return None
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error connecting to geocoding service: {str(e)}")
+    except (KeyError, IndexError, ValueError) as e:
+        raise Exception(f"Error parsing geocoding response: {str(e)}")
 
 def export_map_as_png(m):
     # Save the map as HTML
@@ -85,7 +197,28 @@ def main():
     add_location_button(m)
 
     # Add custom CSS for text labels
-    # ... (code remains the same)
+    css = """
+    <style>
+    .text-label {
+        background-color: white;
+        border: 1px solid #ccc;
+        padding: 5px;
+        font-weight: bold;
+    }
+    .custom-marker-icon {
+        background-color: white;
+        border: 2px solid #3388ff;
+        border-radius: 50%;
+        text-align: center;
+        color: #3388ff;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(css))
 
     # Display the map
     try:
