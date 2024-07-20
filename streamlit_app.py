@@ -5,6 +5,7 @@ from streamlit_folium import folium_static
 import io
 import uuid
 import requests
+from geopy.geocoders import Nominatim
 
 def add_text_to_map(m):
     js = """
@@ -32,6 +33,19 @@ def add_text_to_map(m):
             input.value = '';
         }
     }
+
+    map.on('click', function(e) {
+        var text = prompt("Enter text for this location:");
+        if (text) {
+            L.marker(e.latlng, {
+                icon: L.divIcon({
+                    className: 'text-label',
+                    html: text,
+                    iconSize: [100, 40]
+                })
+            }).addTo(map);
+        }
+    });
     """
     m.get_root().html.add_child(folium.Element(js))
 
@@ -103,6 +117,13 @@ def add_contours(m):
         }
     ).add_to(m)
 
+def geocode_address(address):
+    geolocator = Nominatim(user_agent="my_app")
+    location = geolocator.geocode(address)
+    if location:
+        return location.latitude, location.longitude
+    return None
+
 def main():
     st.title("Interactive Map with Layers, Location, Drawing, and Text")
 
@@ -167,6 +188,18 @@ def main():
     </style>
     """
     m.get_root().html.add_child(folium.Element(css))
+
+    # Address input
+    address = st.text_input("Enter an address to zoom to:")
+    if address:
+        result = geocode_address(address)
+        if result:
+            lat, lon = result
+            m.location = [lat, lon]
+            m.zoom_start = 15
+            folium.Marker([lat, lon], popup=address).add_to(m)
+        else:
+            st.error("Could not find the address. Please try again.")
 
     # Display the map
     map_data = folium_static(m, width=700, height=500)
