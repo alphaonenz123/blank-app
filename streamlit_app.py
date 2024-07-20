@@ -1,6 +1,6 @@
 import streamlit as st
 import folium
-from folium.plugins import Draw, MousePosition
+from folium.plugins import Draw, MousePosition, LocateControl
 from streamlit_folium import folium_static
 import io
 import uuid
@@ -34,8 +34,42 @@ def add_text_to_map(m):
     """
     m.get_root().html.add_child(folium.Element(js))
 
+def add_location_button(m):
+    js = """
+    L.Control.LocationButton = L.Control.extend({
+        onAdd: function(map) {
+            var btn = L.DomUtil.create('button', 'location-button');
+            btn.innerHTML = 'My Location';
+            btn.style.backgroundColor = 'white';
+            btn.style.padding = '5px';
+            btn.style.border = '2px solid #ccc';
+            btn.style.borderRadius = '4px';
+            btn.onclick = function() {
+                map.locate({setView: true, maxZoom: 16});
+            };
+            return btn;
+        }
+    });
+    L.control.locationButton = function(opts) {
+        return new L.Control.LocationButton(opts);
+    }
+    L.control.locationButton({ position: 'topleft' }).addTo(map);
+
+    map.on('locationfound', function(e) {
+        var radius = e.accuracy / 2;
+        L.marker(e.latlng).addTo(map)
+            .bindPopup("You are within " + radius + " meters from this point").openPopup();
+        L.circle(e.latlng, radius).addTo(map);
+    });
+
+    map.on('locationerror', function(e) {
+        alert(e.message);
+    });
+    """
+    m.get_root().html.add_child(folium.Element(js))
+
 def main():
-    st.title("Interactive Map with Drawing and Text")
+    st.title("Interactive Map with Location, Drawing, and Text")
 
     # Initialize the map
     m = folium.Map(location=[0, 0], zoom_start=2)
@@ -59,6 +93,9 @@ def main():
 
     # Add custom text control
     add_text_to_map(m)
+
+    # Add location button
+    add_location_button(m)
 
     # Add custom CSS for text labels
     css = """
