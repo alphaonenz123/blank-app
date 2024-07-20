@@ -5,6 +5,13 @@ from streamlit_folium import folium_static
 import io
 import uuid
 import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+import base64
+import time
 
 def add_text_to_map(m):
     js = """
@@ -130,98 +137,42 @@ def geocode_address(address):
     except (KeyError, IndexError, ValueError) as e:
         raise Exception(f"Error parsing geocoding response: {str(e)}")
 
+def capture_map_image(map_html):
+    # Set up Selenium to run in headless mode
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    driver = webdriver.Chrome(options=chrome_options)
+    
+    # Save the map HTML to a temporary file
+    with open("temp_map.html", "w") as f:
+        f.write(map_html)
+    
+    # Open the temporary HTML file
+    driver.get("file://" + os.path.abspath("temp_map.html"))
+    
+    # Wait for the map to load
+    time.sleep(5)
+    
+    # Capture the screenshot
+    screenshot = driver.get_screenshot_as_png()
+    
+    driver.quit()
+    
+    # Remove the temporary file
+    os.remove("temp_map.html")
+    
+    return Image.open(io.BytesIO(screenshot))
+
 def main():
     st.title("Interactive Map with Layers, Location, Drawing, and Text")
 
-    # Initialize the map
-    initial_lat = st.number_input("Enter latitude", value=0.0, min_value=-90.0, max_value=90.0)
-    initial_lon = st.number_input("Enter longitude", value=0.0, min_value=-180.0, max_value=180.0)
-    zoom_level = st.slider("Zoom level", min_value=1, max_value=18, value=2)
-    marker_text = st.text_input("Enter text for the marker", value="My Marker")
+    # Load CSS
+    load_css('static/style.css')
 
-    m = folium.Map(location=[initial_lat, initial_lon], zoom_start=zoom_level, control_scale=True)
-
-    # Add tile layers
-    folium.TileLayer('OpenStreetMap').add_to(m)
-    folium.TileLayer('Stamen Terrain').add_to(m)
-    folium.TileLayer('Stamen Toner').add_to(m)
-    folium.TileLayer('Stamen Water Color').add_to(m)
-    folium.TileLayer('CartoDB Positron').add_to(m)
-    folium.TileLayer('CartoDB Dark_Matter').add_to(m)
-    
-    # Add satellite layer
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri',
-        name='Satellite',
-        overlay=False,
-        control=True
-    ).add_to(m)
-
-    # Add contours
-    add_contours(m)
-
-    # Add layer control
-    folium.LayerControl().add_to(m)
-
-    # Add draw control to the map
-    draw = Draw(
-        draw_options={
-            'polyline': True,
-            'rectangle': True,
-            'polygon': True,
-            'circle': True,
-            'marker': True,
-            'circlemarker': True
-        },
-        edit_options={'edit': True}
-    )
-    m.add_child(draw)
-
-    # Add mouse position display
-    MousePosition().add_to(m)
-
-    # Add custom text control
-    add_text_to_map(m)
-
-    # Add location button
-    add_location_button(m)
-
-    # Add custom CSS for text labels
-    css = """
-    <style>
-    .text-label {
-        background-color: white;
-        border: 1px solid #ccc;
-        padding: 5px;
-        font-weight: bold;
-    }
-    .custom-marker-icon {
-        background-color: white;
-        border: 2px solid #3388ff;
-        border-radius: 50%;
-        text-align: center;
-        color: #3388ff;
-        font-weight: bold;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    </style>
-    """
-    m.get_root().html.add_child(folium.Element(css))
-
-    # Add a marker at the specified coordinates with custom text
-    folium.Marker(
-        [initial_lat, initial_lon],
-        popup=f"{marker_text}<br>Lat: {initial_lat}, Lon: {initial_lon}",
-        tooltip=marker_text,
-        icon=folium.DivIcon(
-            html=f'<div class="custom-marker-icon">{marker_text}</div>',
-            icon_size=(100, 40),
-            icon_anchor=(50, 20),
-        )
-    ).add_to(m)
+    # ... (keep your existing map setup code)
 
     # Display the map
     try:
@@ -230,19 +181,47 @@ def main():
         st.error(f"An error occurred while displaying the map: {str(e)}")
         st.info("Please try refreshing the page or check your internet connection.")
 
-    # Export map button
+    # Export options
+    export_format = st.selectbox("Select export format", ["HTML", "JPEG", "PDF"])
+    
     if st.button("Export Map"):
         try:
             # Save the map to a string buffer
             buffer = io.BytesIO()
             m.save(buffer, close_file=False)
+            map_html = buffer.getvalue().decode()
             
-            btn = st.download_button(
-                label="Download Map",
-                data=buffer.getvalue().decode(),
-                file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.html",
-                mime="text/html"
-            )
+            if export_format == "HTML":
+                btn = st.download_button(
+                    label="Download Map (HTML)",
+                    data=map_html,
+                    file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.html",
+                    mime="text/html"
+                )
+            elif export_format in ["JPEG", "PDF"]:
+                # Capture the map as an image
+                map_image = capture_map_image(map_html)
+                
+                if export_format == "JPEG":
+                    img_buffer = io.BytesIO()
+                    map_image.save(img_buffer, format="JPEG")
+                    btn = st.download_button(
+                        label="Download Map (JPEG)",
+                        data=img_buffer.getvalue(),
+                        file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.jpg",
+                        mime="image/jpeg"
+                    )
+                else:  # PDF
+                    pdf_buffer = io.BytesIO()
+                    c = canvas.Canvas(pdf_buffer, pagesize=(700, 500))
+                    c.drawImage(ImageReader(map_image), 0, 0, width=700, height=500)
+                    c.save()
+                    btn = st.download_button(
+                        label="Download Map (PDF)",
+                        data=pdf_buffer.getvalue(),
+                        file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.pdf",
+                        mime="application/pdf"
+                    )
         except Exception as e:
             st.error(f"An error occurred while exporting the map: {str(e)}")
             st.info("Please try again or check your internet connection.")
