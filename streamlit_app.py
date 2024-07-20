@@ -1,9 +1,10 @@
 import streamlit as st
 import folium
-from folium.plugins import Draw, MousePosition, LocateControl
+from folium.plugins import Draw, MousePosition, MarkerCluster
 from streamlit_folium import folium_static
 import io
 import uuid
+import requests
 
 def add_text_to_map(m):
     js = """
@@ -68,11 +69,68 @@ def add_location_button(m):
     """
     m.get_root().html.add_child(folium.Element(js))
 
+def add_contours(m):
+    # This is a simplified example. In a real-world scenario, you'd use actual contour data.
+    contour_data = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {"elevation": 100},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-5, 40], [5, 40]]
+                }
+            },
+            {
+                "type": "Feature",
+                "properties": {"elevation": 200},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-5, 45], [5, 45]]
+                }
+            }
+        ]
+    }
+    
+    folium.GeoJson(
+        contour_data,
+        name="Contours",
+        style_function=lambda feature: {
+            "color": "red",
+            "weight": 2,
+            "opacity": 0.7
+        }
+    ).add_to(m)
+
 def main():
-    st.title("Interactive Map with Location, Drawing, and Text")
+    st.title("Interactive Map with Layers, Location, Drawing, and Text")
 
     # Initialize the map
-    m = folium.Map(location=[0, 0], zoom_start=2)
+    m = folium.Map(location=[0, 0], zoom_start=2, control_scale=True)
+
+    # Add tile layers
+    folium.TileLayer('OpenStreetMap').add_to(m)
+    folium.TileLayer('Stamen Terrain').add_to(m)
+    folium.TileLayer('Stamen Toner').add_to(m)
+    folium.TileLayer('Stamen Water Color').add_to(m)
+    folium.TileLayer('CartoDB Positron').add_to(m)
+    folium.TileLayer('CartoDB Dark_Matter').add_to(m)
+    
+    # Add satellite layer
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri',
+        name='Satellite',
+        overlay=False,
+        control=True
+    ).add_to(m)
+
+    # Add contours
+    add_contours(m)
+
+    # Add layer control
+    folium.LayerControl().add_to(m)
 
     # Add draw control to the map
     draw = Draw(
