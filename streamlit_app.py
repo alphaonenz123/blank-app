@@ -1,28 +1,41 @@
-import sys
-
-try:
-    import streamlit as st
-except ImportError as e:
-    print(f"Error importing streamlit: {e}")
-    sys.exit(1)
-
-try:
-    import folium
-    from folium.plugins import Draw
-except ImportError as e:
-    print(f"Error importing folium: {e}")
-    sys.exit(1)
-
-try:
-    from streamlit_folium import folium_static
-except ImportError as e:
-    print(f"Error importing streamlit_folium: {e}")
-    sys.exit(1)
-
+import streamlit as st
+import folium
+from folium.plugins import Draw, MousePosition
+from streamlit_folium import folium_static
 import io
+import uuid
+
+def add_text_to_map(m):
+    js = """
+    var text = L.control({position: 'topright'});
+    text.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'info');
+        div.innerHTML = '<input type="text" id="textInput" placeholder="Enter text">' +
+                        '<button onclick="addText()">Add Text</button>';
+        return div;
+    };
+    text.addTo(map);
+
+    function addText() {
+        var input = document.getElementById('textInput');
+        var text = input.value;
+        if (text) {
+            var center = map.getCenter();
+            L.marker(center, {
+                icon: L.divIcon({
+                    className: 'text-label',
+                    html: text,
+                    iconSize: [100, 40]
+                })
+            }).addTo(map);
+            input.value = '';
+        }
+    }
+    """
+    m.get_root().html.add_child(folium.Element(js))
 
 def main():
-    st.title("Interactive Map Marker")
+    st.title("Interactive Map with Drawing and Text")
 
     # Initialize the map
     m = folium.Map(location=[0, 0], zoom_start=2)
@@ -30,44 +43,37 @@ def main():
     # Add draw control to the map
     draw = Draw(
         draw_options={
-            'polyline': False,
-            'rectangle': False,
-            'polygon': False,
-            'circle': False,
-            'circlemarker': False,
+            'polyline': True,
+            'rectangle': True,
+            'polygon': True,
+            'circle': True,
+            'marker': True,
+            'circlemarker': True
         },
-        edit_options={'edit': False}
+        edit_options={'edit': True}
     )
     m.add_child(draw)
 
+    # Add mouse position display
+    MousePosition().add_to(m)
+
+    # Add custom text control
+    add_text_to_map(m)
+
+    # Add custom CSS for text labels
+    css = """
+    <style>
+    .text-label {
+        background-color: white;
+        border: 1px solid #ccc;
+        padding: 5px;
+        font-weight: bold;
+    }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(css))
+
     # Display the map
-    map_data = folium_static(m, width=700, height=500)
-
-    # Create a button to add markers
-    if st.button("Add Marker"):
-        st.session_state.markers = st.session_state.get('markers', []) + [None]
-
-    # Display input fields for each marker
-    for i, marker in enumerate(st.session_state.get('markers', [])):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            lat = st.number_input(f"Latitude for Marker {i+1}", value=marker[0] if marker else 0.0, key=f"lat_{i}")
-        with col2:
-            lon = st.number_input(f"Longitude for Marker {i+1}", value=marker[1] if marker else 0.0, key=f"lon_{i}")
-        with col3:
-            name = st.text_input(f"Name for Marker {i+1}", value=marker[2] if marker and len(marker) > 2 else "", key=f"name_{i}")
-        
-        st.session_state.markers[i] = (lat, lon, name)
-
-    # Add markers to the map
-    for marker in st.session_state.get('markers', []):
-        if marker[0] and marker[1]:
-            folium.Marker(
-                location=[marker[0], marker[1]],
-                popup=marker[2] if marker[2] else None
-            ).add_to(m)
-
-    # Display the updated map
     map_data = folium_static(m, width=700, height=500)
 
     # Export map button
@@ -79,7 +85,7 @@ def main():
         btn = st.download_button(
             label="Download Map",
             data=buffer.getvalue().decode(),
-            file_name="interactive_map.html",
+            file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.html",
             mime="text/html"
         )
 
