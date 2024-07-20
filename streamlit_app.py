@@ -137,6 +137,7 @@ def main():
     initial_lat = st.number_input("Enter latitude", value=0.0, min_value=-90.0, max_value=90.0)
     initial_lon = st.number_input("Enter longitude", value=0.0, min_value=-180.0, max_value=180.0)
     zoom_level = st.slider("Zoom level", min_value=1, max_value=18, value=2)
+    marker_text = st.text_input("Enter text for the marker", value="My Marker")
 
     m = folium.Map(location=[initial_lat, initial_lon], zoom_start=zoom_level, control_scale=True)
 
@@ -195,12 +196,32 @@ def main():
         padding: 5px;
         font-weight: bold;
     }
+    .custom-marker-icon {
+        background-color: white;
+        border: 2px solid #3388ff;
+        border-radius: 50%;
+        text-align: center;
+        color: #3388ff;
+        font-weight: bold;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
     </style>
     """
     m.get_root().html.add_child(folium.Element(css))
 
-    # Add a marker at the specified coordinates
-    folium.Marker([initial_lat, initial_lon], popup=f"Lat: {initial_lat}, Lon: {initial_lon}").add_to(m)
+    # Add a marker at the specified coordinates with custom text
+    folium.Marker(
+        [initial_lat, initial_lon],
+        popup=f"{marker_text}<br>Lat: {initial_lat}, Lon: {initial_lon}",
+        tooltip=marker_text,
+        icon=folium.DivIcon(
+            html=f'<div class="custom-marker-icon">{marker_text}</div>',
+            icon_size=(100, 40),
+            icon_anchor=(50, 20),
+        )
+    ).add_to(m)
 
     # Display the map
     try:
