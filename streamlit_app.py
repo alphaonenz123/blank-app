@@ -118,12 +118,17 @@ def add_contours(m):
 
 def geocode_address(address):
     url = f"https://nominatim.openstreetmap.org/search?q={address}&format=json"
-    response = requests.get(url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raises an HTTPError for bad responses
         data = response.json()
         if data:
             return float(data[0]['lat']), float(data[0]['lon'])
-    return None
+        return None
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error connecting to geocoding service: {str(e)}")
+    except (KeyError, IndexError, ValueError) as e:
+        raise Exception(f"Error parsing geocoding response: {str(e)}")
 
 def main():
     st.title("Interactive Map with Layers, Location, Drawing, and Text")
@@ -193,29 +198,42 @@ def main():
     # Address input
     address = st.text_input("Enter an address to zoom to:")
     if address:
-        result = geocode_address(address)
-        if result:
-            lat, lon = result
-            m = folium.Map(location=[lat, lon], zoom_start=15)
-            folium.Marker([lat, lon], popup=address).add_to(m)
-        else:
-            st.error("Could not find the address. Please try again.")
+        try:
+            result = geocode_address(address)
+            if result:
+                lat, lon = result
+                m = folium.Map(location=[lat, lon], zoom_start=15)
+                folium.Marker([lat, lon], popup=address).add_to(m)
+                st.success(f"Address found: {address}")
+            else:
+                st.warning("Could not find the address. Please try a more specific address.")
+        except Exception as e:
+            st.error(f"An error occurred while searching for the address: {str(e)}")
+            st.info("Please try again or use a different address.")
 
     # Display the map
-    map_data = folium_static(m, width=700, height=500)
+    try:
+        map_data = folium_static(m, width=700, height=500)
+    except Exception as e:
+        st.error(f"An error occurred while displaying the map: {str(e)}")
+        st.info("Please try refreshing the page or check your internet connection.")
 
     # Export map button
     if st.button("Export Map"):
-        # Save the map to a string buffer
-        buffer = io.BytesIO()
-        m.save(buffer, close_file=False)
-        
-        btn = st.download_button(
-            label="Download Map",
-            data=buffer.getvalue().decode(),
-            file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.html",
-            mime="text/html"
-        )
+        try:
+            # Save the map to a string buffer
+            buffer = io.BytesIO()
+            m.save(buffer, close_file=False)
+            
+            btn = st.download_button(
+                label="Download Map",
+                data=buffer.getvalue().decode(),
+                file_name=f"interactive_map_{uuid.uuid4().hex[:8]}.html",
+                mime="text/html"
+            )
+        except Exception as e:
+            st.error(f"An error occurred while exporting the map: {str(e)}")
+            st.info("Please try again or check your internet connection.")
 
 if __name__ == "__main__":
     main()
